@@ -22,7 +22,7 @@ import { toast } from "sonner";
 
 export const Route = createFileRoute("/app/ai-assistant")({
   head: () => ({ meta: [{ title: "Nurture AI — Your Care Companion" }] }),
-  component: AIAssistant;
+  component: AIAssistant,
 });
 
 interface Msg { id: string; role: "user" | "assistant"; text?: string; ai?: AIResponse; time: string; streaming?: boolean }
