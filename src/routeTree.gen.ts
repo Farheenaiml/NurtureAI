@@ -15,11 +15,14 @@ import { Route as LoginRouteImport } from './routes/login'
 import { Route as AppRouteImport } from './routes/app'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AppIndexRouteImport } from './routes/app.index'
+import { Route as AppWellnessRouteImport } from './routes/app.wellness'
 import { Route as AppPregnancyRouteImport } from './routes/app.pregnancy'
+import { Route as AppPostpartumRouteImport } from './routes/app.postpartum'
 import { Route as AppNutritionRouteImport } from './routes/app.nutrition'
 import { Route as AppKickTrackerRouteImport } from './routes/app.kick-tracker'
 import { Route as AppExerciseRouteImport } from './routes/app.exercise'
 import { Route as AppBabyDevelopmentRouteImport } from './routes/app.baby-development'
+import { Route as AppBabyCareRouteImport } from './routes/app.baby-care'
 import { Route as AppAiAssistantRouteImport } from './routes/app.ai-assistant'
 import { Route as AppSymptomsIndexRouteImport } from './routes/app.symptoms.index'
 import { Route as AppSymptomsIdRouteImport } from './routes/app.symptoms.$id'
@@ -54,9 +57,19 @@ const AppIndexRoute = AppIndexRouteImport.update({
   path: '/',
   getParentRoute: () => AppRoute,
 } as any)
+const AppWellnessRoute = AppWellnessRouteImport.update({
+  id: '/wellness',
+  path: '/wellness',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppPregnancyRoute = AppPregnancyRouteImport.update({
   id: '/pregnancy',
   path: '/pregnancy',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppPostpartumRoute = AppPostpartumRouteImport.update({
+  id: '/postpartum',
+  path: '/postpartum',
   getParentRoute: () => AppRoute,
 } as any)
 const AppNutritionRoute = AppNutritionRouteImport.update({
@@ -77,6 +90,11 @@ const AppExerciseRoute = AppExerciseRouteImport.update({
 const AppBabyDevelopmentRoute = AppBabyDevelopmentRouteImport.update({
   id: '/baby-development',
   path: '/baby-development',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppBabyCareRoute = AppBabyCareRouteImport.update({
+  id: '/baby-care',
+  path: '/baby-care',
   getParentRoute: () => AppRoute,
 } as any)
 const AppAiAssistantRoute = AppAiAssistantRouteImport.update({
@@ -102,11 +120,14 @@ export interface FileRoutesByFullPath {
   '/onboarding': typeof OnboardingRoute
   '/signup': typeof SignupRoute
   '/app/ai-assistant': typeof AppAiAssistantRoute
+  '/app/baby-care': typeof AppBabyCareRoute
   '/app/baby-development': typeof AppBabyDevelopmentRoute
   '/app/exercise': typeof AppExerciseRoute
   '/app/kick-tracker': typeof AppKickTrackerRoute
   '/app/nutrition': typeof AppNutritionRoute
+  '/app/postpartum': typeof AppPostpartumRoute
   '/app/pregnancy': typeof AppPregnancyRoute
+  '/app/wellness': typeof AppWellnessRoute
   '/app/': typeof AppIndexRoute
   '/app/symptoms/$id': typeof AppSymptomsIdRoute
   '/app/symptoms/': typeof AppSymptomsIndexRoute
@@ -117,11 +138,14 @@ export interface FileRoutesByTo {
   '/onboarding': typeof OnboardingRoute
   '/signup': typeof SignupRoute
   '/app/ai-assistant': typeof AppAiAssistantRoute
+  '/app/baby-care': typeof AppBabyCareRoute
   '/app/baby-development': typeof AppBabyDevelopmentRoute
   '/app/exercise': typeof AppExerciseRoute
   '/app/kick-tracker': typeof AppKickTrackerRoute
   '/app/nutrition': typeof AppNutritionRoute
+  '/app/postpartum': typeof AppPostpartumRoute
   '/app/pregnancy': typeof AppPregnancyRoute
+  '/app/wellness': typeof AppWellnessRoute
   '/app': typeof AppIndexRoute
   '/app/symptoms/$id': typeof AppSymptomsIdRoute
   '/app/symptoms': typeof AppSymptomsIndexRoute
@@ -134,11 +158,14 @@ export interface FileRoutesById {
   '/onboarding': typeof OnboardingRoute
   '/signup': typeof SignupRoute
   '/app/ai-assistant': typeof AppAiAssistantRoute
+  '/app/baby-care': typeof AppBabyCareRoute
   '/app/baby-development': typeof AppBabyDevelopmentRoute
   '/app/exercise': typeof AppExerciseRoute
   '/app/kick-tracker': typeof AppKickTrackerRoute
   '/app/nutrition': typeof AppNutritionRoute
+  '/app/postpartum': typeof AppPostpartumRoute
   '/app/pregnancy': typeof AppPregnancyRoute
+  '/app/wellness': typeof AppWellnessRoute
   '/app/': typeof AppIndexRoute
   '/app/symptoms/$id': typeof AppSymptomsIdRoute
   '/app/symptoms/': typeof AppSymptomsIndexRoute
@@ -152,11 +179,14 @@ export interface FileRouteTypes {
     | '/onboarding'
     | '/signup'
     | '/app/ai-assistant'
+    | '/app/baby-care'
     | '/app/baby-development'
     | '/app/exercise'
     | '/app/kick-tracker'
     | '/app/nutrition'
+    | '/app/postpartum'
     | '/app/pregnancy'
+    | '/app/wellness'
     | '/app/'
     | '/app/symptoms/$id'
     | '/app/symptoms/'
@@ -167,11 +197,14 @@ export interface FileRouteTypes {
     | '/onboarding'
     | '/signup'
     | '/app/ai-assistant'
+    | '/app/baby-care'
     | '/app/baby-development'
     | '/app/exercise'
     | '/app/kick-tracker'
     | '/app/nutrition'
+    | '/app/postpartum'
     | '/app/pregnancy'
+    | '/app/wellness'
     | '/app'
     | '/app/symptoms/$id'
     | '/app/symptoms'
@@ -183,11 +216,14 @@ export interface FileRouteTypes {
     | '/onboarding'
     | '/signup'
     | '/app/ai-assistant'
+    | '/app/baby-care'
     | '/app/baby-development'
     | '/app/exercise'
     | '/app/kick-tracker'
     | '/app/nutrition'
+    | '/app/postpartum'
     | '/app/pregnancy'
+    | '/app/wellness'
     | '/app/'
     | '/app/symptoms/$id'
     | '/app/symptoms/'
@@ -245,11 +281,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppIndexRouteImport
       parentRoute: typeof AppRoute
     }
+    '/app/wellness': {
+      id: '/app/wellness'
+      path: '/wellness'
+      fullPath: '/app/wellness'
+      preLoaderRoute: typeof AppWellnessRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/app/pregnancy': {
       id: '/app/pregnancy'
       path: '/pregnancy'
       fullPath: '/app/pregnancy'
       preLoaderRoute: typeof AppPregnancyRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/app/postpartum': {
+      id: '/app/postpartum'
+      path: '/postpartum'
+      fullPath: '/app/postpartum'
+      preLoaderRoute: typeof AppPostpartumRouteImport
       parentRoute: typeof AppRoute
     }
     '/app/nutrition': {
@@ -280,6 +330,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppBabyDevelopmentRouteImport
       parentRoute: typeof AppRoute
     }
+    '/app/baby-care': {
+      id: '/app/baby-care'
+      path: '/baby-care'
+      fullPath: '/app/baby-care'
+      preLoaderRoute: typeof AppBabyCareRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/app/ai-assistant': {
       id: '/app/ai-assistant'
       path: '/ai-assistant'
@@ -306,11 +363,14 @@ declare module '@tanstack/react-router' {
 
 interface AppRouteChildren {
   AppAiAssistantRoute: typeof AppAiAssistantRoute
+  AppBabyCareRoute: typeof AppBabyCareRoute
   AppBabyDevelopmentRoute: typeof AppBabyDevelopmentRoute
   AppExerciseRoute: typeof AppExerciseRoute
   AppKickTrackerRoute: typeof AppKickTrackerRoute
   AppNutritionRoute: typeof AppNutritionRoute
+  AppPostpartumRoute: typeof AppPostpartumRoute
   AppPregnancyRoute: typeof AppPregnancyRoute
+  AppWellnessRoute: typeof AppWellnessRoute
   AppIndexRoute: typeof AppIndexRoute
   AppSymptomsIdRoute: typeof AppSymptomsIdRoute
   AppSymptomsIndexRoute: typeof AppSymptomsIndexRoute
@@ -318,11 +378,14 @@ interface AppRouteChildren {
 
 const AppRouteChildren: AppRouteChildren = {
   AppAiAssistantRoute: AppAiAssistantRoute,
+  AppBabyCareRoute: AppBabyCareRoute,
   AppBabyDevelopmentRoute: AppBabyDevelopmentRoute,
   AppExerciseRoute: AppExerciseRoute,
   AppKickTrackerRoute: AppKickTrackerRoute,
   AppNutritionRoute: AppNutritionRoute,
+  AppPostpartumRoute: AppPostpartumRoute,
   AppPregnancyRoute: AppPregnancyRoute,
+  AppWellnessRoute: AppWellnessRoute,
   AppIndexRoute: AppIndexRoute,
   AppSymptomsIdRoute: AppSymptomsIdRoute,
   AppSymptomsIndexRoute: AppSymptomsIndexRoute,
