@@ -30,8 +30,8 @@ function EmergencyPage() {
       <Card className="rounded-3xl border-border/60 p-6">
         <h3 className="mb-3 font-display font-bold">Emergency Medical Information</h3>
         <div className="grid gap-3 sm:grid-cols-2">
-          {[["Blood Group", user?.bloodGroup ?? "—", Droplet], ["Allergies", user?.allergies ?? "—", Siren], ["Medicines", user?.medications ?? "—", Siren], ["Doctor", user?.doctor ?? "—", Phone], ["Emergency Contact", user?.emergencyContact ?? "—", Phone]].map(([k, v]) => (
-            <div key={k as string} className="flex justify-between rounded-xl bg-muted/40 px-3 py-2.5 text-sm"><span className="text-muted-foreground">{k}</span><span className="truncate pl-2 font-medium">{v}</span></div>
+          {[["Blood Group", user?.bloodGroup ?? "—"], ["Allergies", user?.allergies ?? "—"], ["Medicines", user?.medications ?? "—"], ["Doctor", user?.doctor ?? "—"], ["Emergency Contact", user?.emergencyContact ?? "—"]].map(([k, v]) => (
+            <div key={k} className="flex justify-between rounded-xl bg-muted/40 px-3 py-2.5 text-sm"><span className="text-muted-foreground">{k}</span><span className="truncate pl-2 font-medium">{v}</span></div>
           ))}
         </div>
       </Card>

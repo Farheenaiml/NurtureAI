@@ -16,6 +16,7 @@ import { Route as AppRouteImport } from './routes/app'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AppIndexRouteImport } from './routes/app.index'
 import { Route as AppWellnessRouteImport } from './routes/app.wellness'
+import { Route as AppSettingsRouteImport } from './routes/app.settings'
 import { Route as AppReportsRouteImport } from './routes/app.reports'
 import { Route as AppProfileRouteImport } from './routes/app.profile'
 import { Route as AppPregnancyRouteImport } from './routes/app.pregnancy'
@@ -25,6 +26,7 @@ import { Route as AppNotificationsRouteImport } from './routes/app.notifications
 import { Route as AppKickTrackerRouteImport } from './routes/app.kick-tracker'
 import { Route as AppJournalRouteImport } from './routes/app.journal'
 import { Route as AppExerciseRouteImport } from './routes/app.exercise'
+import { Route as AppEmergencyRouteImport } from './routes/app.emergency'
 import { Route as AppBreastfeedingRouteImport } from './routes/app.breastfeeding'
 import { Route as AppBabyDevelopmentRouteImport } from './routes/app.baby-development'
 import { Route as AppBabyCareRouteImport } from './routes/app.baby-care'
@@ -66,6 +68,11 @@ const AppIndexRoute = AppIndexRouteImport.update({
 const AppWellnessRoute = AppWellnessRouteImport.update({
   id: '/wellness',
   path: '/wellness',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppSettingsRoute = AppSettingsRouteImport.update({
+  id: '/settings',
+  path: '/settings',
   getParentRoute: () => AppRoute,
 } as any)
 const AppReportsRoute = AppReportsRouteImport.update({
@@ -111,6 +118,11 @@ const AppJournalRoute = AppJournalRouteImport.update({
 const AppExerciseRoute = AppExerciseRouteImport.update({
   id: '/exercise',
   path: '/exercise',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppEmergencyRoute = AppEmergencyRouteImport.update({
+  id: '/emergency',
+  path: '/emergency',
   getParentRoute: () => AppRoute,
 } as any)
 const AppBreastfeedingRoute = AppBreastfeedingRouteImport.update({
@@ -160,6 +172,7 @@ export interface FileRoutesByFullPath {
   '/app/baby-care': typeof AppBabyCareRoute
   '/app/baby-development': typeof AppBabyDevelopmentRoute
   '/app/breastfeeding': typeof AppBreastfeedingRoute
+  '/app/emergency': typeof AppEmergencyRoute
   '/app/exercise': typeof AppExerciseRoute
   '/app/journal': typeof AppJournalRoute
   '/app/kick-tracker': typeof AppKickTrackerRoute
@@ -169,6 +182,7 @@ export interface FileRoutesByFullPath {
   '/app/pregnancy': typeof AppPregnancyRoute
   '/app/profile': typeof AppProfileRoute
   '/app/reports': typeof AppReportsRoute
+  '/app/settings': typeof AppSettingsRoute
   '/app/wellness': typeof AppWellnessRoute
   '/app/': typeof AppIndexRoute
   '/app/symptoms/$id': typeof AppSymptomsIdRoute
@@ -184,6 +198,7 @@ export interface FileRoutesByTo {
   '/app/baby-care': typeof AppBabyCareRoute
   '/app/baby-development': typeof AppBabyDevelopmentRoute
   '/app/breastfeeding': typeof AppBreastfeedingRoute
+  '/app/emergency': typeof AppEmergencyRoute
   '/app/exercise': typeof AppExerciseRoute
   '/app/journal': typeof AppJournalRoute
   '/app/kick-tracker': typeof AppKickTrackerRoute
@@ -193,6 +208,7 @@ export interface FileRoutesByTo {
   '/app/pregnancy': typeof AppPregnancyRoute
   '/app/profile': typeof AppProfileRoute
   '/app/reports': typeof AppReportsRoute
+  '/app/settings': typeof AppSettingsRoute
   '/app/wellness': typeof AppWellnessRoute
   '/app': typeof AppIndexRoute
   '/app/symptoms/$id': typeof AppSymptomsIdRoute
@@ -210,6 +226,7 @@ export interface FileRoutesById {
   '/app/baby-care': typeof AppBabyCareRoute
   '/app/baby-development': typeof AppBabyDevelopmentRoute
   '/app/breastfeeding': typeof AppBreastfeedingRoute
+  '/app/emergency': typeof AppEmergencyRoute
   '/app/exercise': typeof AppExerciseRoute
   '/app/journal': typeof AppJournalRoute
   '/app/kick-tracker': typeof AppKickTrackerRoute
@@ -219,6 +236,7 @@ export interface FileRoutesById {
   '/app/pregnancy': typeof AppPregnancyRoute
   '/app/profile': typeof AppProfileRoute
   '/app/reports': typeof AppReportsRoute
+  '/app/settings': typeof AppSettingsRoute
   '/app/wellness': typeof AppWellnessRoute
   '/app/': typeof AppIndexRoute
   '/app/symptoms/$id': typeof AppSymptomsIdRoute
@@ -237,6 +255,7 @@ export interface FileRouteTypes {
     | '/app/baby-care'
     | '/app/baby-development'
     | '/app/breastfeeding'
+    | '/app/emergency'
     | '/app/exercise'
     | '/app/journal'
     | '/app/kick-tracker'
@@ -246,6 +265,7 @@ export interface FileRouteTypes {
     | '/app/pregnancy'
     | '/app/profile'
     | '/app/reports'
+    | '/app/settings'
     | '/app/wellness'
     | '/app/'
     | '/app/symptoms/$id'
@@ -261,6 +281,7 @@ export interface FileRouteTypes {
     | '/app/baby-care'
     | '/app/baby-development'
     | '/app/breastfeeding'
+    | '/app/emergency'
     | '/app/exercise'
     | '/app/journal'
     | '/app/kick-tracker'
@@ -270,6 +291,7 @@ export interface FileRouteTypes {
     | '/app/pregnancy'
     | '/app/profile'
     | '/app/reports'
+    | '/app/settings'
     | '/app/wellness'
     | '/app'
     | '/app/symptoms/$id'
@@ -286,6 +308,7 @@ export interface FileRouteTypes {
     | '/app/baby-care'
     | '/app/baby-development'
     | '/app/breastfeeding'
+    | '/app/emergency'
     | '/app/exercise'
     | '/app/journal'
     | '/app/kick-tracker'
@@ -295,6 +318,7 @@ export interface FileRouteTypes {
     | '/app/pregnancy'
     | '/app/profile'
     | '/app/reports'
+    | '/app/settings'
     | '/app/wellness'
     | '/app/'
     | '/app/symptoms/$id'
@@ -360,6 +384,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppWellnessRouteImport
       parentRoute: typeof AppRoute
     }
+    '/app/settings': {
+      id: '/app/settings'
+      path: '/settings'
+      fullPath: '/app/settings'
+      preLoaderRoute: typeof AppSettingsRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/app/reports': {
       id: '/app/reports'
       path: '/reports'
@@ -423,6 +454,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppExerciseRouteImport
       parentRoute: typeof AppRoute
     }
+    '/app/emergency': {
+      id: '/app/emergency'
+      path: '/emergency'
+      fullPath: '/app/emergency'
+      preLoaderRoute: typeof AppEmergencyRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/app/breastfeeding': {
       id: '/app/breastfeeding'
       path: '/breastfeeding'
@@ -481,6 +519,7 @@ interface AppRouteChildren {
   AppBabyCareRoute: typeof AppBabyCareRoute
   AppBabyDevelopmentRoute: typeof AppBabyDevelopmentRoute
   AppBreastfeedingRoute: typeof AppBreastfeedingRoute
+  AppEmergencyRoute: typeof AppEmergencyRoute
   AppExerciseRoute: typeof AppExerciseRoute
   AppJournalRoute: typeof AppJournalRoute
   AppKickTrackerRoute: typeof AppKickTrackerRoute
@@ -490,6 +529,7 @@ interface AppRouteChildren {
   AppPregnancyRoute: typeof AppPregnancyRoute
   AppProfileRoute: typeof AppProfileRoute
   AppReportsRoute: typeof AppReportsRoute
+  AppSettingsRoute: typeof AppSettingsRoute
   AppWellnessRoute: typeof AppWellnessRoute
   AppIndexRoute: typeof AppIndexRoute
   AppSymptomsIdRoute: typeof AppSymptomsIdRoute
@@ -502,6 +542,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppBabyCareRoute: AppBabyCareRoute,
   AppBabyDevelopmentRoute: AppBabyDevelopmentRoute,
   AppBreastfeedingRoute: AppBreastfeedingRoute,
+  AppEmergencyRoute: AppEmergencyRoute,
   AppExerciseRoute: AppExerciseRoute,
   AppJournalRoute: AppJournalRoute,
   AppKickTrackerRoute: AppKickTrackerRoute,
@@ -511,6 +552,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppPregnancyRoute: AppPregnancyRoute,
   AppProfileRoute: AppProfileRoute,
   AppReportsRoute: AppReportsRoute,
+  AppSettingsRoute: AppSettingsRoute,
   AppWellnessRoute: AppWellnessRoute,
   AppIndexRoute: AppIndexRoute,
   AppSymptomsIdRoute: AppSymptomsIdRoute,
