@@ -17,8 +17,10 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as AppIndexRouteImport } from './routes/app.index'
 import { Route as AppPregnancyRouteImport } from './routes/app.pregnancy'
 import { Route as AppNutritionRouteImport } from './routes/app.nutrition'
+import { Route as AppBabyDevelopmentRouteImport } from './routes/app.baby-development'
 import { Route as AppAiAssistantRouteImport } from './routes/app.ai-assistant'
 import { Route as AppSymptomsIndexRouteImport } from './routes/app.symptoms.index'
+import { Route as AppSymptomsIdRouteImport } from './routes/app.symptoms.$id'
 
 const SignupRoute = SignupRouteImport.update({
   id: '/signup',
@@ -60,6 +62,11 @@ const AppNutritionRoute = AppNutritionRouteImport.update({
   path: '/nutrition',
   getParentRoute: () => AppRoute,
 } as any)
+const AppBabyDevelopmentRoute = AppBabyDevelopmentRouteImport.update({
+  id: '/baby-development',
+  path: '/baby-development',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppAiAssistantRoute = AppAiAssistantRouteImport.update({
   id: '/ai-assistant',
   path: '/ai-assistant',
@@ -70,6 +77,11 @@ const AppSymptomsIndexRoute = AppSymptomsIndexRouteImport.update({
   path: '/symptoms/',
   getParentRoute: () => AppRoute,
 } as any)
+const AppSymptomsIdRoute = AppSymptomsIdRouteImport.update({
+  id: '/symptoms/$id',
+  path: '/symptoms/$id',
+  getParentRoute: () => AppRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -78,9 +90,11 @@ export interface FileRoutesByFullPath {
   '/onboarding': typeof OnboardingRoute
   '/signup': typeof SignupRoute
   '/app/ai-assistant': typeof AppAiAssistantRoute
+  '/app/baby-development': typeof AppBabyDevelopmentRoute
   '/app/nutrition': typeof AppNutritionRoute
   '/app/pregnancy': typeof AppPregnancyRoute
   '/app/': typeof AppIndexRoute
+  '/app/symptoms/$id': typeof AppSymptomsIdRoute
   '/app/symptoms/': typeof AppSymptomsIndexRoute
 }
 export interface FileRoutesByTo {
@@ -89,9 +103,11 @@ export interface FileRoutesByTo {
   '/onboarding': typeof OnboardingRoute
   '/signup': typeof SignupRoute
   '/app/ai-assistant': typeof AppAiAssistantRoute
+  '/app/baby-development': typeof AppBabyDevelopmentRoute
   '/app/nutrition': typeof AppNutritionRoute
   '/app/pregnancy': typeof AppPregnancyRoute
   '/app': typeof AppIndexRoute
+  '/app/symptoms/$id': typeof AppSymptomsIdRoute
   '/app/symptoms': typeof AppSymptomsIndexRoute
 }
 export interface FileRoutesById {
@@ -102,9 +118,11 @@ export interface FileRoutesById {
   '/onboarding': typeof OnboardingRoute
   '/signup': typeof SignupRoute
   '/app/ai-assistant': typeof AppAiAssistantRoute
+  '/app/baby-development': typeof AppBabyDevelopmentRoute
   '/app/nutrition': typeof AppNutritionRoute
   '/app/pregnancy': typeof AppPregnancyRoute
   '/app/': typeof AppIndexRoute
+  '/app/symptoms/$id': typeof AppSymptomsIdRoute
   '/app/symptoms/': typeof AppSymptomsIndexRoute
 }
 export interface FileRouteTypes {
@@ -116,9 +134,11 @@ export interface FileRouteTypes {
     | '/onboarding'
     | '/signup'
     | '/app/ai-assistant'
+    | '/app/baby-development'
     | '/app/nutrition'
     | '/app/pregnancy'
     | '/app/'
+    | '/app/symptoms/$id'
     | '/app/symptoms/'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -127,9 +147,11 @@ export interface FileRouteTypes {
     | '/onboarding'
     | '/signup'
     | '/app/ai-assistant'
+    | '/app/baby-development'
     | '/app/nutrition'
     | '/app/pregnancy'
     | '/app'
+    | '/app/symptoms/$id'
     | '/app/symptoms'
   id:
     | '__root__'
@@ -139,9 +161,11 @@ export interface FileRouteTypes {
     | '/onboarding'
     | '/signup'
     | '/app/ai-assistant'
+    | '/app/baby-development'
     | '/app/nutrition'
     | '/app/pregnancy'
     | '/app/'
+    | '/app/symptoms/$id'
     | '/app/symptoms/'
   fileRoutesById: FileRoutesById
 }
@@ -211,6 +235,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppNutritionRouteImport
       parentRoute: typeof AppRoute
     }
+    '/app/baby-development': {
+      id: '/app/baby-development'
+      path: '/baby-development'
+      fullPath: '/app/baby-development'
+      preLoaderRoute: typeof AppBabyDevelopmentRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/app/ai-assistant': {
       id: '/app/ai-assistant'
       path: '/ai-assistant'
@@ -225,22 +256,33 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppSymptomsIndexRouteImport
       parentRoute: typeof AppRoute
     }
+    '/app/symptoms/$id': {
+      id: '/app/symptoms/$id'
+      path: '/symptoms/$id'
+      fullPath: '/app/symptoms/$id'
+      preLoaderRoute: typeof AppSymptomsIdRouteImport
+      parentRoute: typeof AppRoute
+    }
   }
 }
 
 interface AppRouteChildren {
   AppAiAssistantRoute: typeof AppAiAssistantRoute
+  AppBabyDevelopmentRoute: typeof AppBabyDevelopmentRoute
   AppNutritionRoute: typeof AppNutritionRoute
   AppPregnancyRoute: typeof AppPregnancyRoute
   AppIndexRoute: typeof AppIndexRoute
+  AppSymptomsIdRoute: typeof AppSymptomsIdRoute
   AppSymptomsIndexRoute: typeof AppSymptomsIndexRoute
 }
 
 const AppRouteChildren: AppRouteChildren = {
   AppAiAssistantRoute: AppAiAssistantRoute,
+  AppBabyDevelopmentRoute: AppBabyDevelopmentRoute,
   AppNutritionRoute: AppNutritionRoute,
   AppPregnancyRoute: AppPregnancyRoute,
   AppIndexRoute: AppIndexRoute,
+  AppSymptomsIdRoute: AppSymptomsIdRoute,
   AppSymptomsIndexRoute: AppSymptomsIndexRoute,
 }
 
