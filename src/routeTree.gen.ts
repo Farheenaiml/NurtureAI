@@ -17,6 +17,8 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as AppIndexRouteImport } from './routes/app.index'
 import { Route as AppPregnancyRouteImport } from './routes/app.pregnancy'
 import { Route as AppNutritionRouteImport } from './routes/app.nutrition'
+import { Route as AppKickTrackerRouteImport } from './routes/app.kick-tracker'
+import { Route as AppExerciseRouteImport } from './routes/app.exercise'
 import { Route as AppBabyDevelopmentRouteImport } from './routes/app.baby-development'
 import { Route as AppAiAssistantRouteImport } from './routes/app.ai-assistant'
 import { Route as AppSymptomsIndexRouteImport } from './routes/app.symptoms.index'
@@ -62,6 +64,16 @@ const AppNutritionRoute = AppNutritionRouteImport.update({
   path: '/nutrition',
   getParentRoute: () => AppRoute,
 } as any)
+const AppKickTrackerRoute = AppKickTrackerRouteImport.update({
+  id: '/kick-tracker',
+  path: '/kick-tracker',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppExerciseRoute = AppExerciseRouteImport.update({
+  id: '/exercise',
+  path: '/exercise',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppBabyDevelopmentRoute = AppBabyDevelopmentRouteImport.update({
   id: '/baby-development',
   path: '/baby-development',
@@ -91,6 +103,8 @@ export interface FileRoutesByFullPath {
   '/signup': typeof SignupRoute
   '/app/ai-assistant': typeof AppAiAssistantRoute
   '/app/baby-development': typeof AppBabyDevelopmentRoute
+  '/app/exercise': typeof AppExerciseRoute
+  '/app/kick-tracker': typeof AppKickTrackerRoute
   '/app/nutrition': typeof AppNutritionRoute
   '/app/pregnancy': typeof AppPregnancyRoute
   '/app/': typeof AppIndexRoute
@@ -104,6 +118,8 @@ export interface FileRoutesByTo {
   '/signup': typeof SignupRoute
   '/app/ai-assistant': typeof AppAiAssistantRoute
   '/app/baby-development': typeof AppBabyDevelopmentRoute
+  '/app/exercise': typeof AppExerciseRoute
+  '/app/kick-tracker': typeof AppKickTrackerRoute
   '/app/nutrition': typeof AppNutritionRoute
   '/app/pregnancy': typeof AppPregnancyRoute
   '/app': typeof AppIndexRoute
@@ -119,6 +135,8 @@ export interface FileRoutesById {
   '/signup': typeof SignupRoute
   '/app/ai-assistant': typeof AppAiAssistantRoute
   '/app/baby-development': typeof AppBabyDevelopmentRoute
+  '/app/exercise': typeof AppExerciseRoute
+  '/app/kick-tracker': typeof AppKickTrackerRoute
   '/app/nutrition': typeof AppNutritionRoute
   '/app/pregnancy': typeof AppPregnancyRoute
   '/app/': typeof AppIndexRoute
@@ -135,6 +153,8 @@ export interface FileRouteTypes {
     | '/signup'
     | '/app/ai-assistant'
     | '/app/baby-development'
+    | '/app/exercise'
+    | '/app/kick-tracker'
     | '/app/nutrition'
     | '/app/pregnancy'
     | '/app/'
@@ -148,6 +168,8 @@ export interface FileRouteTypes {
     | '/signup'
     | '/app/ai-assistant'
     | '/app/baby-development'
+    | '/app/exercise'
+    | '/app/kick-tracker'
     | '/app/nutrition'
     | '/app/pregnancy'
     | '/app'
@@ -162,6 +184,8 @@ export interface FileRouteTypes {
     | '/signup'
     | '/app/ai-assistant'
     | '/app/baby-development'
+    | '/app/exercise'
+    | '/app/kick-tracker'
     | '/app/nutrition'
     | '/app/pregnancy'
     | '/app/'
@@ -235,6 +259,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppNutritionRouteImport
       parentRoute: typeof AppRoute
     }
+    '/app/kick-tracker': {
+      id: '/app/kick-tracker'
+      path: '/kick-tracker'
+      fullPath: '/app/kick-tracker'
+      preLoaderRoute: typeof AppKickTrackerRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/app/exercise': {
+      id: '/app/exercise'
+      path: '/exercise'
+      fullPath: '/app/exercise'
+      preLoaderRoute: typeof AppExerciseRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/app/baby-development': {
       id: '/app/baby-development'
       path: '/baby-development'
@@ -269,6 +307,8 @@ declare module '@tanstack/react-router' {
 interface AppRouteChildren {
   AppAiAssistantRoute: typeof AppAiAssistantRoute
   AppBabyDevelopmentRoute: typeof AppBabyDevelopmentRoute
+  AppExerciseRoute: typeof AppExerciseRoute
+  AppKickTrackerRoute: typeof AppKickTrackerRoute
   AppNutritionRoute: typeof AppNutritionRoute
   AppPregnancyRoute: typeof AppPregnancyRoute
   AppIndexRoute: typeof AppIndexRoute
@@ -279,6 +319,8 @@ interface AppRouteChildren {
 const AppRouteChildren: AppRouteChildren = {
   AppAiAssistantRoute: AppAiAssistantRoute,
   AppBabyDevelopmentRoute: AppBabyDevelopmentRoute,
+  AppExerciseRoute: AppExerciseRoute,
+  AppKickTrackerRoute: AppKickTrackerRoute,
   AppNutritionRoute: AppNutritionRoute,
   AppPregnancyRoute: AppPregnancyRoute,
   AppIndexRoute: AppIndexRoute,
