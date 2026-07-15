@@ -1,4 +1,4 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, useNavigate, redirect } from "@tanstack/react-router";
 import { useState } from "react";
 import {
   User, HeartPulse, Stethoscope, Siren, Settings2, ArrowLeft, ArrowRight, Check, Baby,
@@ -12,11 +12,29 @@ import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Logo } from "@/components/Logo";
 import { useAuthStore, type JourneyStage } from "@/store/authStore";
+import { getCurrentUserServerFn } from "../backend/authServer";
 import { languages } from "@/services/mockData";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/onboarding")({
   head: () => ({ meta: [{ title: "Set Up Your Profile — Nurture" }] }),
+  loader: async () => {
+    try {
+      const user = await getCurrentUserServerFn();
+      if (!user) {
+        throw redirect({ to: "/login" });
+      }
+      if (user.onboarded) {
+        throw redirect({ to: "/app" });
+      }
+      return { user };
+    } catch (e) {
+      if (e && typeof e === "object" && "status" in e) {
+        throw e;
+      }
+      throw redirect({ to: "/login" });
+    }
+  },
   component: Onboarding,
 });
 
@@ -44,32 +62,36 @@ function Onboarding() {
 
   const next = () => setStep((s) => Math.min(4, s + 1));
   const back = () => setStep((s) => Math.max(0, s - 1));
-  const finish = () => {
-    completeOnboarding({
-      fullName: String(d.fullName) || user?.fullName,
-      age: Number(d.age) || undefined,
-      country: String(d.country),
-      language: String(d.language),
-      stage: d.stage as JourneyStage,
-      currentWeek: Number(d.currentWeek) || 26,
-      dueDate: String(d.dueDate) || undefined,
-      previousPregnancy: Boolean(d.previousPregnancy),
-      babyAgeWeeks: Number(d.babyAgeWeeks) || 6,
-      deliveryType: String(d.deliveryType),
-      breastfeeding: Boolean(d.breastfeeding),
-      height: Number(d.height) || undefined,
-      weight: Number(d.weight) || undefined,
-      bloodGroup: String(d.bloodGroup),
-      conditions: String(d.conditions),
-      allergies: String(d.allergies),
-      medications: String(d.medications),
-      doctor: String(d.doctor),
-      hospital: String(d.hospital),
-      emergencyContact: String(d.emergencyContact),
-      emergencyRelationship: String(d.emergencyRelationship),
-    });
-    toast.success("Profile complete! Welcome to Nurture 🌸");
-    navigate({ to: "/app" });
+  const finish = async () => {
+    try {
+      await completeOnboarding({
+        fullName: String(d.fullName) || user?.fullName,
+        age: Number(d.age) || undefined,
+        country: String(d.country),
+        language: String(d.language),
+        stage: d.stage as JourneyStage,
+        currentWeek: d.stage === "pregnant" ? (Number(d.currentWeek) || undefined) : undefined,
+        dueDate: d.stage === "pregnant" ? (String(d.dueDate) || undefined) : undefined,
+        previousPregnancy: d.stage === "pregnant" ? Boolean(d.previousPregnancy) : undefined,
+        babyAgeWeeks: d.stage === "postpartum" ? (Number(d.babyAgeWeeks) || undefined) : undefined,
+        deliveryType: d.stage === "postpartum" ? String(d.deliveryType) : undefined,
+        breastfeeding: d.stage === "postpartum" ? Boolean(d.breastfeeding) : undefined,
+        height: Number(d.height) || undefined,
+        weight: Number(d.weight) || undefined,
+        bloodGroup: String(d.bloodGroup),
+        conditions: String(d.conditions),
+        allergies: String(d.allergies),
+        medications: String(d.medications),
+        doctor: String(d.doctor),
+        hospital: String(d.hospital),
+        emergencyContact: String(d.emergencyContact),
+        emergencyRelationship: String(d.emergencyRelationship),
+      });
+      toast.success("Profile complete! Welcome to Nurture 🌸");
+      navigate({ to: "/app" });
+    } catch (err: any) {
+      toast.error(err.message || "Failed to complete onboarding. Please try again.");
+    }
   };
 
   const progress = ((step + 1) / 5) * 100;

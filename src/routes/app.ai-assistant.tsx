@@ -3,7 +3,7 @@ import { useState, useRef, useEffect } from "react";
 import {
   Bot, Send, Mic, Upload, Plus, Search, Pin, Trash2, MoreVertical, Copy, ThumbsUp, ThumbsDown,
   RefreshCw, Share2, Bookmark, Languages, Sparkles, ShieldCheck, Volume2, AlertTriangle,
-  Phone, MapPin, Stethoscope, ChevronDown, PanelLeft, Check,
+  Phone, MapPin, Stethoscope, ChevronDown, PanelLeft, Check, FileText, Play, Pause, VolumeX, Square, RotateCcw
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -15,8 +15,15 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
-import { conversations as seedConversations, suggestedQuestions } from "@/services/mockData";
-import { generateAIResponse, type AIResponse } from "@/services/index";
+import { suggestedQuestions } from "@/services/mockData";
+import type { AIResponse } from "../backend/mockFallback";
+import {
+  getConversationsServerFn,
+  getMessagesServerFn,
+  sendAIMessageServerFn,
+  deleteConversationServerFn,
+  togglePinConversationServerFn,
+} from "../backend/aiServer";
 import { VoiceMode } from "@/components/ai/VoiceMode";
 import { toast } from "sonner";
 
@@ -37,38 +44,453 @@ const smartActions = [
 ];
 
 function AIAssistant() {
-  const [convos, setConvos] = useState(seedConversations);
+  const [convos, setConvos] = useState<any[]>([]);
+  const [activeConvoId, setActiveConvoId] = useState<string | undefined>(undefined);
   const [messages, setMessages] = useState<Msg[]>([]);
   const [input, setInput] = useState("");
   const [thinking, setThinking] = useState(false);
-  const [voiceOpen, setVoiceOpen] = useState(false);
   const [uploadOpen, setUploadOpen] = useState(false);
-  const scrollRef = useRef<HTMLDivElement>(null);
-  const inputRef = useRef<HTMLTextAreaElement>(null);
+  const [autoPlaySpeech, setAutoPlaySpeech] = useState(false);
+  const [isLastSendVoice, setIsLastSendVoice] = useState(false);
+  // Voice Recording inline states
+  const [isRecording, setIsRecording] = useState(false);
+  const [isTranscribing, setIsTranscribing] = useState(false);
+  const [recSeconds, setRecSeconds] = useState(0);
 
-  useEffect(() => { inputRef.current?.focus(); }, []);
-  useEffect(() => { scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" }); }, [messages, thinking]);
+  const recMediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const recStreamRef = useRef<MediaStream | null>(null);
+  const recAudioCtxRef = useRef<AudioContext | null>(null);
+  const recTimerRef = useRef<any>(null);
+  const chunksRef = useRef<Blob[]>([]);
 
-  const send = (text: string) => {
-    if (!text.trim()) return;
-    const now = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-    setMessages((m) => [...m, { id: crypto.randomUUID(), role: "user", text, time: now }]);
-    setInput("");
-    setThinking(true);
-    setTimeout(() => {
-      const ai = generateAIResponse(text);
-      setThinking(false);
-      setMessages((m) => [...m, { id: crypto.randomUUID(), role: "assistant", ai, time: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }), streaming: true }]);
-      setTimeout(() => setMessages((m) => m.map((x) => ({ ...x, streaming: false }))), 1400);
-    }, 1400);
+  // Global Audio Player states and refs
+  const [speakingMsgId, setSpeakingMsgId] = useState<string | null>(null);
+  const [speakingText, setSpeakingText] = useState<string | null>(null);
+  const [isPlayingAudio, setIsPlayingAudio] = useState(false);
+  const [isAudioMuted, setIsAudioMuted] = useState(false);
+  const globalAudioRef = useRef<HTMLAudioElement | null>(null);
+  const isFetchingAudioRef = useRef(false);
+
+  const stopGlobalAudio = () => {
+    if (globalAudioRef.current) {
+      globalAudioRef.current.pause();
+      globalAudioRef.current.currentTime = 0;
+    }
+    setIsPlayingAudio(false);
+    setSpeakingText(null);
+    setSpeakingMsgId(null);
   };
 
-  const newChat = () => { setMessages([]); toast.success("Started a new chat"); inputRef.current?.focus(); };
+  const playGlobalAudio = async (text: string, msgId: string) => {
+    if (speakingMsgId === msgId && globalAudioRef.current) {
+      if (isPlayingAudio) {
+        globalAudioRef.current.pause();
+        setIsPlayingAudio(false);
+      } else {
+        globalAudioRef.current.play();
+        setIsPlayingAudio(true);
+      }
+      return;
+    }
+
+    stopGlobalAudio();
+
+    if (isFetchingAudioRef.current) return;
+    isFetchingAudioRef.current = true;
+
+    try {
+      setSpeakingText(text);
+      setSpeakingMsgId(msgId);
+      const res = await fetch("http://localhost:8000/text-to-speech", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text })
+      });
+
+      if (!res.ok) throw new Error("TTS generation failed");
+
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const newAudio = new Audio(url);
+
+      newAudio.onended = () => {
+        setIsPlayingAudio(false);
+        setSpeakingText(null);
+        setSpeakingMsgId(null);
+      };
+      newAudio.onplay = () => {
+        setIsPlayingAudio(true);
+      };
+      newAudio.onpause = () => {
+        setIsPlayingAudio(false);
+      };
+
+      newAudio.muted = isAudioMuted;
+      globalAudioRef.current = newAudio;
+      newAudio.play();
+      setIsPlayingAudio(true);
+    } catch (err) {
+      console.error("TTS playback failed:", err);
+      toast.error("Text-to-speech playback failed.");
+      setSpeakingText(null);
+      setSpeakingMsgId(null);
+      setIsPlayingAudio(false);
+    } finally {
+      isFetchingAudioRef.current = false;
+    }
+  };
+
+  const replayGlobalAudio = () => {
+    if (globalAudioRef.current) {
+      globalAudioRef.current.currentTime = 0;
+      globalAudioRef.current.play();
+      setIsPlayingAudio(true);
+    }
+  };
+
+  const toggleMuteGlobalAudio = () => {
+    if (globalAudioRef.current) {
+      const nextMute = !isAudioMuted;
+      globalAudioRef.current.muted = nextMute;
+      setIsAudioMuted(nextMute);
+    } else {
+      setIsAudioMuted(!isAudioMuted);
+    }
+  };
+
+  // Cleanup timers, streams, and audios on unmount
+  useEffect(() => {
+    return () => {
+      if (recTimerRef.current) clearInterval(recTimerRef.current);
+      if (recStreamRef.current) {
+        recStreamRef.current.getTracks().forEach(track => track.stop());
+      }
+      if (recAudioCtxRef.current) {
+        recAudioCtxRef.current.close();
+      }
+      if (globalAudioRef.current) {
+        globalAudioRef.current.pause();
+      }
+    };
+  }, []);
+
+  // Trigger global autoplay when assistant message finishes streaming
+  useEffect(() => {
+    if (autoPlaySpeech && messages.length > 0) {
+      const latestMsg = messages[messages.length - 1];
+      if (latestMsg.role === "assistant" && !latestMsg.streaming && latestMsg.ai) {
+        setAutoPlaySpeech(false); // Consume flag
+        playGlobalAudio(latestMsg.ai.main, latestMsg.id);
+      }
+    }
+  }, [messages, autoPlaySpeech]);
+
+  const startRecordingVoice = async () => {
+    if (typeof window === "undefined") return;
+    try {
+      setIsTranscribing(false);
+      chunksRef.current = [];
+      
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      recStreamRef.current = stream;
+      
+      const recorder = new MediaRecorder(stream, { mimeType: "audio/webm" });
+      recMediaRecorderRef.current = recorder;
+
+      // Silence detection using AudioContext
+      const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+      const audioContext = new AudioContextClass();
+      recAudioCtxRef.current = audioContext;
+      
+      const analyser = audioContext.createAnalyser();
+      const source = audioContext.createMediaStreamSource(stream);
+      source.connect(analyser);
+
+      analyser.fftSize = 256;
+      const bufferLength = analyser.frequencyBinCount;
+      const dataArray = new Uint8Array(bufferLength);
+
+      let silenceStart = Date.now();
+      let isSilent = false;
+
+      const checkSilence = () => {
+        if (recorder.state !== "recording") return;
+        
+        analyser.getByteFrequencyData(dataArray);
+        let sum = 0;
+        for (let i = 0; i < bufferLength; i++) {
+          sum += dataArray[i];
+        }
+        const average = sum / bufferLength;
+
+        if (average < 10) {
+          if (!isSilent) {
+            silenceStart = Date.now();
+            isSilent = true;
+          } else if (Date.now() - silenceStart > 2500) {
+            console.log("[Silence Detection] Auto-stopping due to silence...");
+            recorder.stop();
+            return;
+          }
+        } else {
+          isSilent = false;
+        }
+
+        requestAnimationFrame(checkSilence);
+      };
+
+      recorder.ondataavailable = (e) => {
+        if (e.data && e.data.size > 0) {
+          chunksRef.current.push(e.data);
+        }
+      };
+
+      recorder.onstop = async () => {
+        // Cleanup audio tracks and context
+        stream.getTracks().forEach((track) => track.stop());
+        if (audioContext.state !== "closed") {
+          audioContext.close();
+        }
+
+        const audioBlob = new Blob(chunksRef.current, { type: "audio/webm" });
+        if (audioBlob.size === 0 || chunksRef.current.length === 0) {
+          setIsRecording(false);
+          return;
+        }
+
+        setIsTranscribing(true);
+
+        try {
+          const formData = new FormData();
+          formData.append("file", audioBlob, "recording.webm");
+
+          const response = await fetch("http://localhost:8000/speech-to-text", {
+            method: "POST",
+            body: formData,
+          });
+
+          if (!response.ok) {
+            throw new Error(`STT failed with status ${response.status}`);
+          }
+
+          const resJson = await response.json();
+          const text = resJson.text || "";
+
+          if (text.trim()) {
+            setInput(text);
+            setIsLastSendVoice(true); // Flag that this input originated from voice
+          } else {
+            toast.error("No speech detected. Try again.");
+          }
+        } catch (err) {
+          console.error("STT error:", err);
+          toast.error("Could not transcribe speech.");
+        } finally {
+          setIsTranscribing(false);
+          setIsRecording(false);
+        }
+      };
+
+      recorder.start();
+      setIsRecording(true);
+      setRecSeconds(0);
+      
+      if (recTimerRef.current) clearInterval(recTimerRef.current);
+      recTimerRef.current = setInterval(() => setRecSeconds((s) => s + 1), 1000);
+
+      requestAnimationFrame(checkSilence);
+    } catch (err) {
+      console.error("Microphone access error:", err);
+      toast.error("Microphone permission denied.");
+      setIsRecording(false);
+    }
+  };
+
+  const cancelRecordingVoice = () => {
+    chunksRef.current = [];
+    if (recMediaRecorderRef.current && recMediaRecorderRef.current.state === "recording") {
+      recMediaRecorderRef.current.stop();
+    }
+    setIsRecording(false);
+    if (recTimerRef.current) clearInterval(recTimerRef.current);
+  };
+
+  const stopRecordingVoice = () => {
+    if (recMediaRecorderRef.current && recMediaRecorderRef.current.state === "recording") {
+      recMediaRecorderRef.current.stop();
+    }
+    if (recTimerRef.current) clearInterval(recTimerRef.current);
+  };
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
+  const [selectedFile, setSelectedFile] = useState<{ base64: string; mimeType: string; name: string } | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const fetchConvos = async () => {
+    try {
+      const list = await getConversationsServerFn();
+      setConvos(list);
+    } catch (e) {
+      console.error("Failed to load conversations", e);
+    }
+  };
+
+  const fetchMessages = async (id: string) => {
+    try {
+      setThinking(true);
+      const msgs = await getMessagesServerFn({ data: id });
+      setMessages(msgs);
+    } catch (e) {
+      console.error("Failed to load messages", e);
+    } finally {
+      setThinking(false);
+    }
+  };
+
+  useEffect(() => {
+    inputRef.current?.focus();
+    fetchConvos();
+  }, []);
+
+  useEffect(() => {
+    if (activeConvoId) {
+      fetchMessages(activeConvoId);
+    } else {
+      setMessages([]);
+    }
+  }, [activeConvoId]);
+
+  useEffect(() => {
+    scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
+  }, [messages, thinking]);
+
+  const triggerUpload = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      const base64 = (reader.result as string).split(',')[1];
+      setSelectedFile({
+        base64,
+        mimeType: file.type,
+        name: file.name
+      });
+      toast.success(`Attached ${file.name}`);
+    };
+    reader.onerror = () => {
+      toast.error("Failed to read file");
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const send = async (text: string) => {
+    if (!text.trim() && !selectedFile) return;
+
+    // Stop any active spoken audio before sending a new query
+    stopGlobalAudio();
+
+    // Determine if we should autoplay the reply based on the voice flag
+    if (isLastSendVoice) {
+      setAutoPlaySpeech(true);
+      setIsLastSendVoice(false); // Reset flag
+    } else {
+      setAutoPlaySpeech(false);
+    }
+
+    const now = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+    const userMsg = { 
+      id: crypto.randomUUID(), 
+      role: "user" as const, 
+      text, 
+      time: now,
+      fileName: selectedFile?.name,
+      fileType: selectedFile?.mimeType,
+      fileData: selectedFile?.base64
+    };
+    setMessages((m) => [...m, userMsg]);
+    setInput("");
+    const fileToSend = selectedFile;
+    setSelectedFile(null);
+    setThinking(true);
+
+    try {
+      const res = await sendAIMessageServerFn({
+        data: {
+          prompt: text,
+          conversationId: activeConvoId,
+          file: fileToSend || undefined
+        }
+      });
+
+      const newMsg = {
+        id: res.message.id,
+        role: "assistant" as const,
+        ai: res.message.ai,
+        time: res.message.time,
+        streaming: true
+      };
+
+      setMessages((m) => [...m.filter(x => x.id !== newMsg.id), newMsg]);
+      setTimeout(() => setMessages((m) => m.map((x) => x.id === newMsg.id ? { ...x, streaming: false } : x)), 1400);
+
+      if (!activeConvoId) {
+        setActiveConvoId(res.conversationId);
+      }
+      fetchConvos();
+    } catch (e) {
+      toast.error("Failed to send message.");
+    } finally {
+      setThinking(false);
+    }
+  };
+
+  const newChat = () => {
+    setActiveConvoId(undefined);
+    setMessages([]);
+    toast.success("Started a new chat");
+    inputRef.current?.focus();
+  };
+
+  const handlePin = async (id: string) => {
+    try {
+      await togglePinConversationServerFn({ data: id });
+      fetchConvos();
+    } catch (e) {
+      toast.error("Failed to pin conversation");
+    }
+  };
+
+  const handleDelete = async (id: string) => {
+    try {
+      await deleteConversationServerFn({ data: id });
+      if (activeConvoId === id) {
+        setActiveConvoId(undefined);
+      }
+      fetchConvos();
+      toast.success("Conversation deleted");
+    } catch (e) {
+      toast.error("Failed to delete conversation");
+    }
+  };
 
   return (
     <div className="grid h-[calc(100vh-8rem)] grid-cols-1 gap-4 lg:grid-cols-[280px_1fr]">
       {/* LEFT PANEL (desktop) */}
-      <div className="hidden lg:block"><ConversationPanel convos={convos} setConvos={setConvos} onNew={newChat} /></div>
+      <div className="hidden lg:block">
+        <ConversationPanel
+          convos={convos}
+          activeConvoId={activeConvoId}
+          onSelect={setActiveConvoId}
+          onPin={handlePin}
+          onDelete={handleDelete}
+          onNew={newChat}
+        />
+      </div>
 
       {/* RIGHT PANEL */}
       <Card className="flex min-h-0 flex-col overflow-hidden rounded-3xl border-border/60">
@@ -76,7 +498,16 @@ function AIAssistant() {
         <div className="flex items-center gap-3 border-b border-border/60 px-4 py-3">
           <Sheet>
             <SheetTrigger asChild><Button variant="ghost" size="icon" className="lg:hidden"><PanelLeft className="h-5 w-5" /></Button></SheetTrigger>
-            <SheetContent side="left" className="w-[300px] p-0"><ConversationPanel convos={convos} setConvos={setConvos} onNew={newChat} /></SheetContent>
+            <SheetContent side="left" className="w-[300px] p-0">
+              <ConversationPanel
+                convos={convos}
+                activeConvoId={activeConvoId}
+                onSelect={setActiveConvoId}
+                onPin={handlePin}
+                onDelete={handleDelete}
+                onNew={newChat}
+              />
+            </SheetContent>
           </Sheet>
           <span className="grid h-10 w-10 place-items-center rounded-2xl bg-gradient-primary text-primary-foreground shadow-glow"><Bot className="h-5 w-5" /></span>
           <div className="min-w-0 flex-1">
@@ -87,8 +518,8 @@ function AIAssistant() {
               <span className="flex items-center gap-1"><Mic className="h-3 w-3" /> Voice Ready</span>
             </div>
           </div>
-          <Button variant="outline" size="sm" className="hidden rounded-xl sm:flex" onClick={() => setVoiceOpen(true)}><Mic className="mr-1 h-4 w-4" /> Voice</Button>
-          <Button variant="outline" size="sm" className="hidden rounded-xl sm:flex" onClick={() => setUploadOpen(true)}><Upload className="mr-1 h-4 w-4" /> Upload</Button>
+          <Button variant="outline" size="sm" className="hidden rounded-xl sm:flex" onClick={startRecordingVoice}><Mic className="mr-1 h-4 w-4" /> Voice</Button>
+          <Button variant="outline" size="sm" className="hidden rounded-xl sm:flex" onClick={triggerUpload}><Upload className="mr-1 h-4 w-4" /> Upload</Button>
           <Button variant="ghost" size="icon" onClick={newChat}><Plus className="h-5 w-5" /></Button>
         </div>
 
@@ -96,9 +527,26 @@ function AIAssistant() {
         <ScrollArea className="min-h-0 flex-1">
           <div ref={scrollRef} className="space-y-5 p-4 sm:p-6">
             {messages.length === 0 && !thinking && <EmptyChat onPick={send} />}
-            {messages.map((m) => m.role === "user"
-              ? <UserBubble key={m.id} text={m.text!} time={m.time} />
-              : <AIBubble key={m.id} msg={m} onRegenerate={() => send("regenerate")} />)}
+            {messages.map((m, index) => {
+              const isLast = index === messages.length - 1;
+              return m.role === "user" ? (
+                <UserBubble key={m.id} text={m.text!} time={m.time} fileName={(m as any).fileName} fileType={(m as any).fileType} fileData={(m as any).fileData} />
+              ) : (
+                <AIBubble 
+                  key={m.id} 
+                  msg={m} 
+                  onRegenerate={() => send("regenerate")} 
+                  speakingMsgId={speakingMsgId}
+                  speakingText={speakingText}
+                  isPlayingAudio={isPlayingAudio}
+                  isAudioMuted={isAudioMuted}
+                  onPlayPause={playGlobalAudio}
+                  onStop={stopGlobalAudio}
+                  onReplay={replayGlobalAudio}
+                  onMuteToggle={toggleMuteGlobalAudio}
+                />
+              );
+            })}
             {thinking && <ThinkingBubble />}
           </div>
         </ScrollArea>
@@ -116,41 +564,154 @@ function AIAssistant() {
 
         {/* composer */}
         <div className="p-4 pt-2">
-          <div className="flex items-end gap-2 rounded-2xl border border-border/60 bg-card p-2 shadow-soft focus-within:border-primary/40">
-            <Button variant="ghost" size="icon" className="shrink-0" onClick={() => setUploadOpen(true)}><Upload className="h-5 w-5" /></Button>
-            <Textarea
-              ref={inputRef}
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(input); } }}
-              placeholder="Ask Nurture anything about your journey…"
-              className="max-h-32 min-h-[42px] resize-none border-0 bg-transparent p-2 shadow-none focus-visible:ring-0"
-              rows={1}
-            />
-            <Button variant="ghost" size="icon" className="shrink-0" onClick={() => setVoiceOpen(true)}><Mic className="h-5 w-5" /></Button>
-            <Button size="icon" className="shrink-0 rounded-xl bg-gradient-primary" onClick={() => send(input)} disabled={!input.trim()}><Send className="h-4 w-4" /></Button>
-          </div>
+          {speakingText && (
+            <div className="mb-3 flex items-center justify-between gap-3 rounded-xl border border-primary/20 bg-primary/5 px-4 py-2 text-sm shadow-soft animate-fade-in">
+              <div className="flex items-center gap-2 text-primary font-medium">
+                <span className="relative flex h-2 w-2">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-primary"></span>
+                </span>
+                <span className="truncate max-w-[200px] sm:max-w-xs text-xs font-semibold">Speaking response...</span>
+              </div>
+              <div className="flex items-center gap-1">
+                <Button 
+                  variant="ghost" 
+                  size="icon" 
+                  className="h-7 w-7 rounded-lg text-primary hover:bg-primary/10" 
+                  onClick={() => playGlobalAudio(speakingText || "", speakingMsgId || "")}
+                >
+                  {isPlayingAudio ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
+                </Button>
+                <Button 
+                  variant="ghost" 
+                  size="icon" 
+                  className="h-7 w-7 rounded-lg text-muted-foreground hover:bg-destructive/10 hover:text-destructive" 
+                  onClick={stopGlobalAudio}
+                >
+                  <Square className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+          )}
+          {selectedFile && (
+            <div className="mb-2 flex items-center gap-2 rounded-xl bg-accent px-3 py-1.5 text-xs text-primary max-w-max">
+              <span className="truncate max-w-[200px] font-medium">{selectedFile.name}</span>
+              <button onClick={() => setSelectedFile(null)} className="font-bold hover:text-destructive text-sm ml-1">×</button>
+            </div>
+          )}
+          
+          {isRecording ? (
+            /* Recording active state: shows animated waveform, elapsed time, cancel and check buttons */
+            <div className="flex items-center justify-between gap-3 rounded-2xl border border-primary/30 bg-primary/5 p-2 shadow-soft h-[58px]">
+              <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary animate-pulse">
+                <Mic className="h-5 w-5" />
+              </span>
+              
+              {/* Waveform visualizer */}
+              <div className="flex-1 flex items-center justify-center gap-1 px-4 h-6 overflow-hidden">
+                {Array.from({ length: 30 }).map((_, i) => (
+                  <span
+                    key={i}
+                    className="w-1 rounded-full bg-primary/70"
+                    style={{
+                      height: `${6 + Math.abs(Math.sin(i + recSeconds * 3)) * 22}px`,
+                      transition: "height 0.15s ease",
+                    }}
+                  />
+                ))}
+              </div>
+              
+              {/* Elapsed time */}
+              <span className="text-xs font-mono text-primary/80 px-2 shrink-0">
+                {String(Math.floor(recSeconds / 60)).padStart(2, "0")}:{String(recSeconds % 60).padStart(2, "0")}
+              </span>
+              
+              {/* Controls */}
+              <div className="flex items-center gap-1.5 shrink-0">
+                <Button 
+                  variant="ghost" 
+                  size="icon" 
+                  className="rounded-xl text-muted-foreground hover:bg-destructive/10 hover:text-destructive" 
+                  onClick={cancelRecordingVoice}
+                >
+                  <Trash2 className="h-5 w-5" />
+                </Button>
+                <Button 
+                  variant="ghost" 
+                  size="icon" 
+                  className="rounded-xl text-primary hover:bg-primary/10" 
+                  onClick={stopRecordingVoice}
+                >
+                  <Check className="h-5 w-5" />
+                </Button>
+              </div>
+            </div>
+          ) : isTranscribing ? (
+            /* Transcribing state */
+            <div className="flex items-center justify-between gap-3 rounded-2xl border border-border/60 bg-muted/30 p-2 shadow-soft h-[58px]">
+              <div className="flex-1 flex items-center justify-center gap-2 text-sm text-muted-foreground animate-pulse">
+                <span className="h-5 w-5 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+                Transcribing voice note…
+              </div>
+            </div>
+          ) : (
+            /* Normal text compose state */
+            <div className="flex items-end gap-2 rounded-2xl border border-border/60 bg-card p-2 shadow-soft focus-within:border-primary/40">
+              <Button variant="ghost" size="icon" className="shrink-0" onClick={triggerUpload}><Upload className="h-5 w-5" /></Button>
+              <input
+                type="file"
+                ref={fileInputRef}
+                onChange={handleFileChange}
+                accept="image/*,application/pdf"
+                className="hidden"
+              />
+              <Textarea
+                ref={inputRef}
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(input); } }}
+                placeholder="Ask Nurture anything about your journey…"
+                className="max-h-32 min-h-[42px] resize-none border-0 bg-transparent p-2 shadow-none focus-visible:ring-0"
+                rows={1}
+              />
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                className="shrink-0" 
+                onClick={startRecordingVoice}
+              >
+                <Mic className="h-5 w-5" />
+              </Button>
+              <Button size="icon" className="shrink-0 rounded-xl bg-gradient-primary" onClick={() => send(input)} disabled={!input.trim() && !selectedFile}><Send className="h-4 w-4" /></Button>
+            </div>
+          )}
           <p className="mt-2 text-center text-[11px] text-muted-foreground">Nurture AI provides supportive guidance, not medical diagnosis.</p>
         </div>
       </Card>
-
-      <Dialog open={voiceOpen} onOpenChange={setVoiceOpen}>
-        <DialogContent className="max-w-full border-0 bg-transparent p-0 shadow-none sm:max-w-lg">
-          <VoiceMode onClose={() => setVoiceOpen(false)} />
-        </DialogContent>
-      </Dialog>
 
       <UploadDialog open={uploadOpen} onOpenChange={setUploadOpen} />
     </div>
   );
 }
 
-function ConversationPanel({ convos, setConvos, onNew }: { convos: typeof seedConversations; setConvos: (c: typeof seedConversations) => void; onNew: () => void }) {
+function ConversationPanel({
+  convos,
+  activeConvoId,
+  onSelect,
+  onPin,
+  onDelete,
+  onNew
+}: {
+  convos: any[];
+  activeConvoId?: string;
+  onSelect: (id: string) => void;
+  onPin: (id: string) => void;
+  onDelete: (id: string) => void;
+  onNew: () => void;
+}) {
   const [q, setQ] = useState("");
   const groups = ["Today", "Yesterday", "Last Week"] as const;
   const filtered = convos.filter((c) => c.title.toLowerCase().includes(q.toLowerCase()));
-  const del = (id: string) => { setConvos(convos.filter((c) => c.id !== id)); toast.success("Conversation deleted"); };
-  const pin = (id: string) => setConvos(convos.map((c) => c.id === id ? { ...c, pinned: !c.pinned } : c));
 
   return (
     <Card className="flex h-full flex-col rounded-3xl border-border/60">
@@ -165,7 +726,16 @@ function ConversationPanel({ convos, setConvos, onNew }: { convos: typeof seedCo
         {filtered.some((c) => c.pinned) && (
           <>
             <p className="px-2 py-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Pinned</p>
-            {filtered.filter((c) => c.pinned).map((c) => <ConvoRow key={c.id} c={c} onPin={pin} onDelete={del} />)}
+            {filtered.filter((c) => c.pinned).map((c) => (
+              <ConvoRow
+                key={c.id}
+                c={c}
+                active={activeConvoId === c.id}
+                onSelect={onSelect}
+                onPin={onPin}
+                onDelete={onDelete}
+              />
+            ))}
           </>
         )}
         {groups.map((g) => {
@@ -174,7 +744,16 @@ function ConversationPanel({ convos, setConvos, onNew }: { convos: typeof seedCo
           return (
             <div key={g}>
               <p className="px-2 py-1 pt-3 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">{g}</p>
-              {items.map((c) => <ConvoRow key={c.id} c={c} onPin={pin} onDelete={del} />)}
+              {items.map((c) => (
+                <ConvoRow
+                  key={c.id}
+                  c={c}
+                  active={activeConvoId === c.id}
+                  onSelect={onSelect}
+                  onPin={onPin}
+                  onDelete={onDelete}
+                />
+              ))}
             </div>
           );
         })}
@@ -183,12 +762,34 @@ function ConversationPanel({ convos, setConvos, onNew }: { convos: typeof seedCo
   );
 }
 
-function ConvoRow({ c, onPin, onDelete }: { c: typeof seedConversations[number]; onPin: (id: string) => void; onDelete: (id: string) => void }) {
+function ConvoRow({
+  c,
+  active,
+  onSelect,
+  onPin,
+  onDelete
+}: {
+  c: any;
+  active: boolean;
+  onSelect: (id: string) => void;
+  onPin: (id: string) => void;
+  onDelete: (id: string) => void;
+}) {
   return (
-    <div className="group flex items-center gap-2 rounded-xl px-2 py-2 transition hover:bg-accent">
-      <button className="min-w-0 flex-1 truncate text-left text-sm">{c.pinned && <Pin className="mr-1 inline h-3 w-3 text-primary" />}{c.title}</button>
-      <button onClick={() => onPin(c.id)} className="opacity-0 transition group-hover:opacity-100"><Pin className="h-3.5 w-3.5 text-muted-foreground hover:text-primary" /></button>
-      <button onClick={() => onDelete(c.id)} className="opacity-0 transition group-hover:opacity-100"><Trash2 className="h-3.5 w-3.5 text-muted-foreground hover:text-destructive" /></button>
+    <div className={cn(
+      "group flex items-center gap-2 rounded-xl px-2 py-2 transition hover:bg-accent",
+      active && "bg-accent text-primary font-medium"
+    )}>
+      <button onClick={() => onSelect(c.id)} className="min-w-0 flex-1 truncate text-left text-sm">
+        {c.pinned && <Pin className="mr-1 inline h-3.5 w-3.5 text-primary fill-primary" />}
+        {c.title}
+      </button>
+      <button onClick={() => onPin(c.id)} className="opacity-0 transition group-hover:opacity-100">
+        <Pin className={cn("h-3.5 w-3.5 text-muted-foreground hover:text-primary", c.pinned && "text-primary fill-primary")} />
+      </button>
+      <button onClick={() => onDelete(c.id)} className="opacity-0 transition group-hover:opacity-100">
+        <Trash2 className="h-3.5 w-3.5 text-muted-foreground hover:text-destructive" />
+      </button>
     </div>
   );
 }
@@ -208,11 +809,53 @@ function EmptyChat({ onPick }: { onPick: (q: string) => void }) {
   );
 }
 
-function UserBubble({ text, time }: { text: string; time: string }) {
+function formatMessageText(text?: string) {
+  if (!text) return null;
+  const boldFormatted = text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+  return boldFormatted.split('\n').map((para, i) => {
+    if (!para.trim()) return null;
+    return (
+      <p key={i} className="mb-2 last:mb-0 text-sm leading-relaxed" dangerouslySetInnerHTML={{ __html: para }} />
+    );
+  });
+}
+
+function UserBubble({
+  text,
+  time,
+  fileName,
+  fileType,
+  fileData
+}: {
+  text: string;
+  time: string;
+  fileName?: string;
+  fileType?: string;
+  fileData?: string;
+}) {
+  const isImage = fileType?.startsWith("image/");
   return (
     <div className="flex justify-end">
       <div className="max-w-[80%]">
-        <div className="rounded-2xl rounded-tr-md bg-gradient-primary px-4 py-3 text-sm text-primary-foreground shadow-soft">{text}</div>
+        <div className="rounded-2xl rounded-tr-md bg-gradient-primary px-4 py-3 text-sm text-primary-foreground shadow-soft">
+          {fileName && fileData && (
+            <div className="mb-2">
+              {isImage ? (
+                <img
+                  src={`data:${fileType};base64,${fileData}`}
+                  alt={fileName}
+                  className="max-h-40 max-w-full rounded-lg border border-white/20 object-cover"
+                />
+              ) : (
+                <div className="flex items-center gap-2 rounded-lg bg-white/10 p-2 text-xs">
+                  <FileText className="h-4 w-4 shrink-0" />
+                  <span className="truncate font-medium">{fileName}</span>
+                </div>
+              )}
+            </div>
+          )}
+          <div>{text}</div>
+        </div>
         <p className="mt-1 text-right text-[10px] text-muted-foreground">{time}</p>
       </div>
     </div>
@@ -237,19 +880,50 @@ function ThinkingBubble() {
   );
 }
 
-function AIBubble({ msg, onRegenerate }: { msg: Msg; onRegenerate: () => void }) {
+function AIBubble({ 
+  msg, 
+  onRegenerate,
+  speakingMsgId,
+  speakingText,
+  isPlayingAudio,
+  isAudioMuted,
+  onPlayPause,
+  onStop,
+  onReplay,
+  onMuteToggle
+}: { 
+  msg: Msg; 
+  onRegenerate: () => void;
+  speakingMsgId: string | null;
+  speakingText: string | null;
+  isPlayingAudio: boolean;
+  isAudioMuted: boolean;
+  onPlayPause: (text: string, msgId: string) => void;
+  onStop: () => void;
+  onReplay: () => void;
+  onMuteToggle: () => void;
+}) {
   const ai = msg.ai!;
   const [liked, setLiked] = useState<"up" | "down" | null>(null);
+
+  const isThisBubbleSpeaking = speakingMsgId === msg.id;
+  const isThisBubblePlaying = isThisBubbleSpeaking && isPlayingAudio;
+
   return (
     <div className="flex items-start gap-3">
-      <Avatar className="h-8 w-8 shrink-0"><AvatarFallback className="bg-gradient-primary text-primary-foreground"><Bot className="h-4 w-4" /></AvatarFallback></Avatar>
+      <Avatar className={cn("h-8 w-8 shrink-0 transition-all duration-300", isThisBubblePlaying && "ring-2 ring-primary ring-offset-2 animate-pulse")}>
+        <AvatarFallback className="bg-gradient-primary text-primary-foreground">
+          <Bot className="h-4 w-4" />
+        </AvatarFallback>
+      </Avatar>
+      
       <div className="min-w-0 max-w-[85%] flex-1">
         {ai.emergency && <EmergencyResponse />}
         <div className={cn("rounded-2xl rounded-tl-md border bg-card px-4 py-3 shadow-soft", msg.streaming && "animate-fade-up")}>
-          <p className="text-sm leading-relaxed">
-            {ai.main}
+          <div className="space-y-2">
+            {formatMessageText(ai.main)}
             {msg.streaming && <span className="ml-0.5 inline-block h-4 w-1.5 animate-pulse bg-primary align-middle" />}
-          </p>
+          </div>
           {!msg.streaming && (
             <Accordion type="multiple" className="mt-3 space-y-2">
               <Section value="hl" label="Key Highlights" tone="accent"><ul className="space-y-1.5">{ai.highlights.map((h, i) => <li key={i} className="flex gap-2 text-sm"><Check className="mt-0.5 h-3.5 w-3.5 shrink-0 text-success" />{h}</li>)}</ul></Section>
@@ -267,11 +941,44 @@ function AIBubble({ msg, onRegenerate }: { msg: Msg; onRegenerate: () => void })
             <ActionBtn icon={ThumbsUp} active={liked === "up"} onClick={() => setLiked("up")} />
             <ActionBtn icon={ThumbsDown} active={liked === "down"} onClick={() => setLiked("down")} />
             <ActionBtn icon={RefreshCw} onClick={onRegenerate} />
-            <ActionBtn icon={Volume2} onClick={() => toast.success("Reading response aloud…")} />
+            
+            {/* Live voice player action buttons */}
+            {isThisBubbleSpeaking ? (
+              <>
+                <ActionBtn 
+                  icon={isThisBubblePlaying ? Pause : Play} 
+                  label={isThisBubblePlaying ? "Pause" : "Play"} 
+                  onClick={() => onPlayPause(ai.main, msg.id)} 
+                />
+                <ActionBtn 
+                  icon={isAudioMuted ? VolumeX : Volume2} 
+                  label={isAudioMuted ? "Unmute" : "Mute"} 
+                  onClick={onMuteToggle} 
+                />
+                <ActionBtn 
+                  icon={RotateCcw} 
+                  label="Replay" 
+                  onClick={onReplay} 
+                />
+                <ActionBtn 
+                  icon={Square} 
+                  label="Stop" 
+                  onClick={onStop} 
+                />
+              </>
+            ) : (
+              <ActionBtn icon={Volume2} label="Speak" onClick={() => onPlayPause(ai.main, msg.id)} />
+            )}
+            
             <ActionBtn icon={Share2} onClick={() => toast.success("Share link copied")} />
             <ActionBtn icon={Bookmark} onClick={() => toast.success("Bookmarked")} />
             <ActionBtn icon={Languages} onClick={() => toast.success("Translating…")} />
             <span className="ml-1 text-[10px] text-muted-foreground">{msg.time}</span>
+            {isThisBubblePlaying && (
+              <span className="text-[10px] text-primary animate-pulse font-semibold ml-2">
+                ● Speaking...
+              </span>
+            )}
           </div>
         )}
       </div>

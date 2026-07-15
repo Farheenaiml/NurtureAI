@@ -81,8 +81,8 @@ export function Topbar({ onMenu }: { onMenu: () => void }) {
           <DropdownMenuSeparator />
           <DropdownMenuItem
             className="text-destructive focus:text-destructive"
-            onClick={() => {
-              logout();
+            onClick={async () => {
+              await logout();
               toast.success("Signed out");
               navigate({ to: "/" });
             }}

@@ -1,4 +1,4 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, useNavigate, redirect } from "@tanstack/react-router";
 import { useState } from "react";
 import { Mail, Lock, Loader2, Check, Eye, EyeOff } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -7,10 +7,26 @@ import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { AuthLayout, GoogleButton, Link } from "@/components/auth/AuthLayout";
 import { useAuthStore } from "@/store/authStore";
+import { getCurrentUserServerFn } from "../backend/authServer";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/login")({
   head: () => ({ meta: [{ title: "Login — Nurture" }] }),
+  loader: async () => {
+    try {
+      const user = await getCurrentUserServerFn();
+      if (user) {
+        if (!user.onboarded) {
+          throw redirect({ to: "/onboarding" });
+        }
+        throw redirect({ to: "/app" });
+      }
+    } catch (e) {
+      if (e && typeof e === "object" && "status" in e) {
+        throw e;
+      }
+    }
+  },
   component: LoginPage,
 });
 
@@ -24,21 +40,31 @@ function LoginPage() {
   const [done, setDone] = useState(false);
   const [error, setError] = useState("");
 
-  const submit = (e: React.FormEvent) => {
+  const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!email.includes("@") || password.length < 4) {
-      setError("Please enter a valid email and password.");
+      setError("Please enter a valid email and password (min 4 characters).");
       return;
     }
     setError("");
     setLoading(true);
-    setTimeout(() => {
-      setLoading(false);
+    try {
+      await login(email, password);
       setDone(true);
-      login(email);
       toast.success("Welcome back to Nurture 🌸");
-      setTimeout(() => navigate({ to: "/app" }), 700);
-    }, 1200);
+      
+      const onboarded = useAuthStore.getState().onboarded;
+      setTimeout(() => {
+        if (onboarded) {
+          navigate({ to: "/app" });
+        } else {
+          navigate({ to: "/onboarding" });
+        }
+      }, 700);
+    } catch (err: any) {
+      setError(err.message || "Failed to log in. Please check your credentials.");
+      setLoading(false);
+    }
   };
 
   return (

@@ -13,6 +13,8 @@ import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
 import { Toaster } from "@/components/ui/sonner";
 import { useUIStore, applyTheme } from "@/store/uiStore";
+import { useAuthStore } from "@/store/authStore";
+import { getCurrentUserServerFn } from "../backend/authServer";
 
 function NotFoundComponent() {
   return (
@@ -75,6 +77,14 @@ function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
 }
 
 export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()({
+  loader: async () => {
+    try {
+      const user = await getCurrentUserServerFn();
+      return { user };
+    } catch (e) {
+      return { user: null };
+    }
+  },
   head: () => ({
     meta: [
       { charSet: "utf-8" },
@@ -127,12 +137,18 @@ function RootShell({ children }: { children: ReactNode }) {
 }
 
 function RootComponent() {
+  const { user } = Route.useLoaderData();
   const { queryClient } = Route.useRouteContext();
   const theme = useUIStore((s) => s.theme);
+  const setStoreUser = useAuthStore((s) => s.setStoreUser);
 
   useEffect(() => {
     applyTheme(theme);
   }, [theme]);
+
+  useEffect(() => {
+    setStoreUser(user);
+  }, [user, setStoreUser]);
 
   return (
     <QueryClientProvider client={queryClient}>

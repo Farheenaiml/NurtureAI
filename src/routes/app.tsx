@@ -1,11 +1,29 @@
-import { createFileRoute, Outlet, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, Outlet, useNavigate, redirect } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { Sidebar } from "@/components/dashboard/Sidebar";
 import { Topbar } from "@/components/dashboard/Topbar";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
 import { useAuthStore } from "@/store/authStore";
+import { getCurrentUserServerFn } from "../backend/authServer";
 
 export const Route = createFileRoute("/app")({
+  loader: async () => {
+    try {
+      const user = await getCurrentUserServerFn();
+      if (!user) {
+        throw redirect({ to: "/login" });
+      }
+      if (!user.onboarded) {
+        throw redirect({ to: "/onboarding" });
+      }
+      return { user };
+    } catch (e) {
+      if (e && typeof e === "object" && "status" in e) {
+        throw e;
+      }
+      throw redirect({ to: "/login" });
+    }
+  },
   component: AppLayout,
 });
 

@@ -1,5 +1,12 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
+import {
+  getCurrentUserServerFn,
+  signupServerFn,
+  loginServerFn,
+  logoutServerFn,
+  updateUserServerFn,
+} from "../backend/authServer";
 
 export type JourneyStage = "pregnant" | "postpartum";
 
@@ -40,11 +47,12 @@ interface AuthState {
   isAuthenticated: boolean;
   onboarded: boolean;
   user: NurtureUser | null;
-  login: (email: string) => void;
-  signup: (fullName: string, email: string, phone?: string) => void;
-  logout: () => void;
-  completeOnboarding: (data: Partial<NurtureUser>) => void;
-  updateUser: (data: Partial<NurtureUser>) => void;
+  login: (email: string, password?: string) => Promise<void>;
+  signup: (fullName: string, email: string, phone?: string, password?: string) => Promise<void>;
+  logout: () => Promise<void>;
+  completeOnboarding: (data: Partial<NurtureUser>) => Promise<void>;
+  updateUser: (data: Partial<NurtureUser>) => Promise<void>;
+  setStoreUser: (user: (NurtureUser & { onboarded: boolean }) | null) => void;
 }
 
 const demoUser: NurtureUser = {
@@ -81,22 +89,75 @@ export const useAuthStore = create<AuthState>()(
       isAuthenticated: false,
       onboarded: false,
       user: null,
-      login: (email) =>
-        set({ isAuthenticated: true, onboarded: true, user: { ...demoUser, email } }),
-      signup: (fullName, email, phone) =>
-        set({
-          isAuthenticated: true,
-          onboarded: false,
-          user: { ...demoUser, fullName, email, phone },
-        }),
-      logout: () => set({ isAuthenticated: false, onboarded: false, user: null }),
-      completeOnboarding: (data) =>
-        set((s) => ({
-          onboarded: true,
-          user: { ...(s.user ?? demoUser), ...data },
-        })),
-      updateUser: (data) =>
-        set((s) => ({ user: { ...(s.user ?? demoUser), ...data } })),
+      login: async (email, password) => {
+        try {
+          const user = await loginServerFn({ data: { email, password } });
+          set({
+            isAuthenticated: true,
+            onboarded: user.onboarded,
+            user,
+          });
+        } catch (error: any) {
+          throw new Error(error.message || "Failed to log in.");
+        }
+      },
+      signup: async (fullName, email, phone, password) => {
+        try {
+          const user = await signupServerFn({ data: { fullName, email, phone, password } });
+          set({
+            isAuthenticated: true,
+            onboarded: user.onboarded,
+            user,
+          });
+        } catch (error: any) {
+          throw new Error(error.message || "Failed to sign up.");
+        }
+      },
+      logout: async () => {
+        try {
+          await logoutServerFn();
+        } catch (e) {
+          console.error("Logout failed on server", e);
+        } finally {
+          set({ isAuthenticated: false, onboarded: false, user: null });
+        }
+      },
+      completeOnboarding: async (data) => {
+        try {
+          const user = await updateUserServerFn({ data: { ...data, onboarded: true } });
+          set({
+            onboarded: true,
+            user,
+          });
+        } catch (error: any) {
+          throw new Error(error.message || "Failed to complete onboarding.");
+        }
+      },
+      updateUser: async (data) => {
+        try {
+          const user = await updateUserServerFn({ data });
+          set({
+            user,
+          });
+        } catch (error: any) {
+          throw new Error(error.message || "Failed to update profile.");
+        }
+      },
+      setStoreUser: (user) => {
+        if (user) {
+          set({
+            isAuthenticated: true,
+            onboarded: user.onboarded,
+            user,
+          });
+        } else {
+          set({
+            isAuthenticated: false,
+            onboarded: false,
+            user: null,
+          });
+        }
+      },
     }),
     { name: "nurture-auth" },
   ),

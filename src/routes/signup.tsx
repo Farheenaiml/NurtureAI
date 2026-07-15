@@ -1,4 +1,4 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, useNavigate, redirect } from "@tanstack/react-router";
 import { useState } from "react";
 import { Mail, Lock, Loader2, User, Phone, Eye, EyeOff } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -7,10 +7,26 @@ import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { AuthLayout, GoogleButton, Link } from "@/components/auth/AuthLayout";
 import { useAuthStore } from "@/store/authStore";
+import { getCurrentUserServerFn } from "../backend/authServer";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/signup")({
   head: () => ({ meta: [{ title: "Create Account — Nurture" }] }),
+  loader: async () => {
+    try {
+      const user = await getCurrentUserServerFn();
+      if (user) {
+        if (!user.onboarded) {
+          throw redirect({ to: "/onboarding" });
+        }
+        throw redirect({ to: "/app" });
+      }
+    } catch (e) {
+      if (e && typeof e === "object" && "status" in e) {
+        throw e;
+      }
+    }
+  },
   component: SignupPage,
 });
 
@@ -25,7 +41,7 @@ function SignupPage() {
 
   const set = (k: string) => (e: React.ChangeEvent<HTMLInputElement>) => setForm({ ...form, [k]: e.target.value });
 
-  const submit = (e: React.FormEvent) => {
+  const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.name || !form.email.includes("@")) return setError("Please enter your name and a valid email.");
     if (form.password.length < 6) return setError("Password must be at least 6 characters.");
@@ -33,11 +49,14 @@ function SignupPage() {
     if (!agree) return setError("Please accept the Terms & Conditions.");
     setError("");
     setLoading(true);
-    setTimeout(() => {
-      signup(form.name, form.email, form.phone);
+    try {
+      await signup(form.name, form.email, form.phone, form.password);
       toast.success("Account created — let's set up your profile!");
       navigate({ to: "/onboarding" });
-    }, 1200);
+    } catch (err: any) {
+      setError(err.message || "Failed to create account. Please try again.");
+      setLoading(false);
+    }
   };
 
   return (
